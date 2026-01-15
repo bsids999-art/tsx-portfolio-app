@@ -2,29 +2,38 @@ import yfinance as yf
 import pandas as pd
 
 def load_multiple_stocks(tickers):
-    records = []
+    data = []
+
+    prices = yf.download(
+        tickers,
+        period="1y",
+        group_by="ticker",
+        auto_adjust=True,
+        threads=True
+    )
 
     for ticker in tickers:
         try:
-            stock = yf.Ticker(ticker)
-
-            info = stock.info
-            hist = stock.history(period="1y")
-
-            if hist.empty:
+            if ticker not in prices:
                 continue
 
-            records.append({
-                "ticker": ticker,
-                "price": hist["Close"].iloc[-1],
-                "pe_ratio": info.get("trailingPE"),
-                "price_to_book": info.get("priceToBook"),
-                "revenue_growth": info.get("revenueGrowth"),
-                "dividend_yield": info.get("dividendYield"),
-                "sector": info.get("sector", "Unknown")
-            })
+            close = prices[ticker]["Close"].dropna()
+            if close.empty:
+                continue
 
+            price = close.iloc[-1]
+            returns = close.pct_change().dropna()
+
+            data.append({
+                "ticker": ticker,
+                "price": price,
+                "pe_ratio": None,
+                "price_to_book": None,
+                "revenue_growth": returns.mean() * 252,
+                "dividend_yield": None,
+                "sector": "Unknown"
+            })
         except Exception:
             continue
 
-    return pd.DataFrame(records)
+    return pd.DataFrame(data)
